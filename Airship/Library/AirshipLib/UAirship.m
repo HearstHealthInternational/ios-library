@@ -24,10 +24,13 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #import "UAirship.h"
-#import "UAUser.h"
-#import "UAUtils.h"
+
 #import "UA_ASIHTTPRequest.h"
 #import "UA_SBJSON.h"
+
+#import "UAUser.h"
+#import "UAEvent.h"
+#import "UAUtils.h"
 #import "UAKeychainUtils.h"
 
 #define kAirshipProductionServer @"https://go.urbanairship.com"
@@ -142,6 +145,10 @@ BOOL logging = false;
             //set release logging to yes because static lib is built in release mode
             //[UAirship setLogging:YES];
         }
+        
+        // strip leading and trailing whitespace
+        configAppKey = [configAppKey stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        configAppSecret = [configAppSecret stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
         
         //Check for a custom UA server value
         NSString *airshipServer = [config objectForKey:@"AIRSHIP_SERVER"];
@@ -359,8 +366,12 @@ BOOL logging = false;
 }
 
 - (void)registerDeviceToken:(NSData *)token withExtraInfo:(NSDictionary *)info {
+    
     [self updateDeviceToken:token];
     [self registerDeviceTokenWithExtraInfo:info];
+    
+    // add device_registration event
+    [self.analytics addEvent:[UAEventDeviceRegistration eventWithContext:nil]];
 }
 
 - (void)registerDeviceToken:(NSData *)token withAlias:(NSString *)alias {
@@ -398,9 +409,6 @@ BOOL logging = false;
 	
     // succeed register APN device token, then register on UA server
     [self registerDeviceToken:token withExtraInfo:nil];
-    
-    // add device_registration event
-    [self.analytics addEvent:[UAEventDeviceRegistration eventWithContext:nil]];
 	
 }
 

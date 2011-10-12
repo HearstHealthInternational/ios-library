@@ -199,7 +199,8 @@ static Class _uiClass;
         [self addTagToDeviceFailed:request];
     } else {
         UALOG(@"Tag added successfully: %d - %@", request.responseStatusCode, request.url);
-        NSString *tag = [self getTagFromUrl:request.url];
+        NSDictionary* userInfo = request.userInfo;
+        NSString *tag = [userInfo valueForKey:@"tag"];
         if (![tags containsObject:tag]) {
             [tags addObject:tag];
         }
@@ -220,7 +221,8 @@ static Class _uiClass;
         case 204://just removed
         case 404://already removed
             UALOG(@"Tag removed successfully: %d - %@", request.responseStatusCode, request.url);
-            NSString *tag = [self getTagFromUrl:request.url];
+            NSDictionary* userInfo = request.userInfo;
+            NSString *tag = [userInfo valueForKey:@"tag"];
             [tags removeObject:tag];
             [self saveDefaults];
             [self notifyObservers:@selector(removeTagFromDeviceSucceeded)];
@@ -312,13 +314,19 @@ static Class _uiClass;
                            [[UAirship shared] server],
                            [[UAirship shared] deviceToken],
                            tag];
-
-    NSURL *url = [NSURL URLWithString:urlString];
+    NSString *encodedString = [UAUtils urlEncodedStringWithString:urlString encoding:NSUTF8StringEncoding];
+    
+    NSURL *url = [NSURL URLWithString:encodedString];
     UA_ASIHTTPRequest *request = [UAUtils requestWithURL:url
                                        method:@"PUT"
                                      delegate:self
                                        finish:@selector(addTagToDeviceSucceed:)
                                          fail:@selector(addTagToDeviceFailed:)];
+    
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+    [userInfo setValue:tag forKey:@"tag"];
+    request.userInfo = userInfo;
+    
     [request startAsynchronous];
 }
 
@@ -327,13 +335,18 @@ static Class _uiClass;
                            [[UAirship shared] server],
                            [[UAirship shared] deviceToken],
                            tag];
+    NSString *encodedString = [UAUtils urlEncodedStringWithString:urlString encoding:NSUTF8StringEncoding];
 
-    NSURL *url = [NSURL URLWithString:urlString];
+    NSURL *url = [NSURL URLWithString:encodedString];
     UA_ASIHTTPRequest *request = [UAUtils requestWithURL:url
                                        method:@"DELETE"
                                      delegate:self
                                        finish:@selector(removeTagFromDeviceSucceed:)
                                          fail:@selector(removeTagFromDeviceFailed:)];
+    
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+    [userInfo setValue:tag forKey:@"tag"];
+    request.userInfo = userInfo;
 
     [request startAsynchronous];
 }
@@ -368,10 +381,12 @@ static Class _uiClass;
 - (void)handleNotification:(NSDictionary *)notification applicationState:(UIApplicationState)state {
     
     [[UAirship shared].analytics handleNotification:notification];
-    
+        
     if (state != UIApplicationStateActive) {
         UALOG(@"Received a notification for an inactive application state.");
-        [delegate handleBackgroundNotification:notification];
+        
+        if ([delegate respondsToSelector:@selector(handleBackgroundNotification:)])
+            [delegate handleBackgroundNotification:notification];
         return;
     }
     
@@ -384,12 +399,13 @@ static Class _uiClass;
         
 		if ([[apsDict allKeys] containsObject:@"alert"]) {
 
-			if ([[apsDict objectForKey:@"alert"] isKindOfClass:[NSString class]]) {
+			if ([[apsDict objectForKey:@"alert"] isKindOfClass:[NSString class]] &&
+                [delegate respondsToSelector:@selector(displayNotificationAlert:)]) {
                 
 				// The alert is a single string message so we can display it
                 [delegate displayNotificationAlert:[apsDict valueForKey:@"alert"]];
 
-			} else {
+			} else if ([delegate respondsToSelector:@selector(displayLocalizedNotificationAlert:)]) {
 				// The alert is a a dictionary with more localization details
 				// This should be customized to fit your message details or usage scenario
                 [delegate displayLocalizedNotificationAlert:[apsDict valueForKey:@"alert"]];
@@ -403,14 +419,14 @@ static Class _uiClass;
 			
 			if(autobadgeEnabled) {
 				[[UIApplication sharedApplication] setApplicationIconBadgeNumber:[badgeNumber intValue]];
-			} else {
+			} else if ([delegate respondsToSelector:@selector(handleBadgeUpdate:)]) {
 				[delegate handleBadgeUpdate:[badgeNumber intValue]];
 			}
         }
 		
         //sound
 		NSString *soundName = [apsDict valueForKey:@"sound"];
-		if (soundName) {
+		if (soundName && [delegate respondsToSelector:@selector(playNotificationSound:)]) {
 			[delegate playNotificationSound:[apsDict objectForKey:@"sound"]];
 		}
         
@@ -432,8 +448,8 @@ static Class _uiClass;
 	// If any top level items remain, those are custom payload, pass it to the handler
 	// Note: There is come convenience built into this check, if for some reason there's a key collision
 	//	and we're stripping yours above, it's safe to remove this conditional
-	if([[customPayload allKeys] count] > 0) {
-		[delegate handleCustomPayload:notification :customPayload];
+	if([[customPayload allKeys] count] > 0 && [delegate respondsToSelector:@selector(handleNotification:withCustomPayload:)]) {
+		[delegate handleNotification:notification withCustomPayload:customPayload];
     }
 }
 
