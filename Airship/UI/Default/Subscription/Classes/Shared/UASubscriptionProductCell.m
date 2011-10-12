@@ -29,13 +29,13 @@
 
 @implementation UASubscriptionProductCell
 
-@synthesize iconContainer;
+//@synthesize iconContainer;
 @synthesize product;
 @synthesize cellView;
 
 - (void)dealloc {
     product = nil;
-    RELEASE_SAFELY(iconContainer);
+    //RELEASE_SAFELY(iconContainer);
     RELEASE_SAFELY(cellView);
 
     [super dealloc];
@@ -45,15 +45,15 @@
     if (!(self = [super initWithStyle:UITableViewCellStyleDefault reuseIdentifier:reuseIdentifier]))
         return nil;
 
-    iconContainer = [[UAAsyncImageView alloc] initWithFrame:CGRectMake(11, 11, 57, 57)];
+    //iconContainer = [[UAAsyncImageView alloc] initWithFrame:CGRectMake(11, 11, 57, 57)];
 
-    cellView = [[UASubscriptionProductCellView alloc] initWithFrame:CGRectMake(0, 0, 320, 80)];
+    cellView = [[UASubscriptionProductCellView alloc] initWithFrame:CGRectMake(0, 0, 360, 80)];
     cellView.product = self.product;
     cellView.contentMode = UIViewContentModeRedraw;
     self.contentMode = UIViewContentModeScaleToFill;
 
-    [self.contentView addSubview:cellView];
-    [self.contentView addSubview:iconContainer];
+    [self addSubview:cellView];
+    //[self.contentView addSubview:iconContainer];
 
     return self;
 }
@@ -81,7 +81,7 @@
 
     product = newProduct;
     cellView.product = product;
-    [iconContainer loadImageFromURL:product.iconURL];
+    //[iconContainer loadImageFromURL:product.iconURL];
     [cellView refreshCellView];
 }
 

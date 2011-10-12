@@ -28,16 +28,19 @@
 #import "UASubscriptionManager.h"
 #import "UASubscriptionInventory.h"
 #import "UASubscription.h"
-#import "UASubscriptionContent.h"
+#import "UASubscriptionContent+State.h"
 #import "UASubscriptionContentDetailViewController.h"
 #import "UAAsycImageView.h"
 #import "UAViewUtils.h"
 #import "UASubscriptionUI.h"
 #import "ActiveContentPath.h"
+#import "DSActivityView.h"
+
 
 @implementation UASubscriptionContentsViewController
 @synthesize contentsTable;
 @synthesize subscriptionKey;
+@synthesize contents;
 
 #pragma mark lifecyle methods
 
@@ -47,6 +50,7 @@
     RELEASE_SAFELY(downloadedContents);
     RELEASE_SAFELY(undownloadedContents);
     RELEASE_SAFELY(detailViewController);
+    [contents release];
     [super dealloc];
 }
 
@@ -55,6 +59,13 @@
         [[UASubscriptionManager shared] addObserver:self];
     }
     return self;
+}
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad]; 
+    self.contentsTable.backgroundColor = [UIColor clearColor];
+    self.navigationItem.title = @"Issues";
 }
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
@@ -76,6 +87,18 @@
     UASubscription *subscription = [[UASubscriptionManager shared].inventory subscriptionForKey:subscriptionKey];
     downloadedContents = subscription.downloadedContents;
     undownloadedContents = subscription.undownloadedContents;
+    
+    NSMutableArray *newContent = [[NSMutableArray alloc] initWithArray:downloadedContents];
+    [newContent addObjectsFromArray:undownloadedContents];
+    self.contents = newContent;
+    [newContent release];
+    
+    [self.contents sortUsingComparator: ^(id left, id right)
+     {
+         UASubscriptionContent *content1 = (UASubscriptionContent * )left;
+         UASubscriptionContent *content2 = (UASubscriptionContent * )right;
+         return [content2.publishDate compare:content1.publishDate];  
+     }];
 
     [contentsTable reloadData];
 }
@@ -83,19 +106,11 @@
 #pragma mark UITableViewDataSource methods
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if ((section == 0) && (undownloadedContents.count > 0)) {
-        return undownloadedContents.count;
-    } else {
-        return downloadedContents.count;
-    }
-    return 0;
+    return [contents count];
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    int count = 0;
-    if (downloadedContents.count > 0) count ++;
-    if (undownloadedContents.count > 0) count ++;
-    return count;
+    return 1;
 }
 
 static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
@@ -110,26 +125,48 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
         cell = [topLevelObjects objectAtIndex:0];
     }
 
+    [cell.deleteButton useRedDeleteStyle];
 
     UASubscriptionContent *content;
-    if ((indexPath.section == 0) && (undownloadedContents.count > 0)) {
-        content = (UASubscriptionContent *)[undownloadedContents objectAtIndex:indexPath.row];
-    } else {
-        content = (UASubscriptionContent *)[downloadedContents objectAtIndex:indexPath.row];
-    }
 
+    cell.owningTable = tableView;
+    content = [contents objectAtIndex:[indexPath row] ];
     cell.content = content;
+    
+    if ([ActiveContentPath isActiveInternationalContent:content])
+    {
+        [tableView selectRowAtIndexPath:indexPath animated:NO scrollPosition:UITableViewScrollPositionNone];
+    }
+    
     return cell;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if ((section == 0) && (undownloadedContents.count > 0)) {
-        return @"Available";
-    } else
-        return @"Downloaded";
+
+    return nil;
 }
 
 #pragma mark UITableViewDelegate methods
+
+- (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    UASubscriptionContent * content = [contents objectAtIndex:indexPath.row];
+    
+    switch ([content state]) {
+        case NOT_DOWNLOADED:
+        case DOWNLOADED_BUT_DELETED:
+            [cell setBackgroundColor:[UIColor colorWithRed:191.0/255 green:191.0/255 blue:191.0/255 alpha:0.7]];
+            break;
+        case ACTIVE:
+            [cell setBackgroundColor:[UIColor colorWithRed:0.0 green:164.0/255 blue:167.0/255 alpha:0.7]];
+            break;
+        case DOWNLOADED:
+            [cell setBackgroundColor:[UIColor colorWithRed:170.0/255 green:207.0/255 blue:208.0/255 alpha:0.7]];
+            break;
+        default:
+            break;
+    }
+}
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     if (detailViewController == nil) {
@@ -137,9 +174,23 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
                                 initWithNibName:@"UASubscriptionContentDetailView"
                                 bundle:nil];
     }
-    //detailViewController.content = [contents objectAtIndex:indexPath.section];
-    //[self.navigationController pushViewController:detailViewController animated:YES];
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    
+    UASubscriptionContent *content = [contents objectAtIndex:[indexPath row] ];
+    
+    if ([ActiveContentPath fileExistsForContent:content] && ![ActiveContentPath isActiveInternationalContent:content])
+    {
+        [DSBezelActivityView activityViewForView:tableView withLabel:@"Activating"];
+        dispatch_async( dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            [NSThread sleepForTimeInterval:1];
+            NSString *contentPath = [[[ActiveContentPath downloadDirectory] stringByAppendingPathComponent:content.subscriptionKey] stringByAppendingPathComponent:content.contentName];
+            [ActiveContentPath setActiveInternationalContent: contentPath];
+            dispatch_async( dispatch_get_main_queue(), ^{
+                [DSBezelActivityView removeViewAnimated:YES];
+                [tableView reloadData];
+            });
+        });
+    }
+    
 }
 
 #pragma mark UASubscriptionManagerObserver method
@@ -155,7 +206,9 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
     [contentsTable reloadData];
 
     NSString* fullPathToDownload = [[[ActiveContentPath downloadDirectory] stringByAppendingPathComponent:content.subscriptionKey] stringByAppendingPathComponent:content.contentName];
+
     [ActiveContentPath setActiveInternationalContent:fullPathToDownload];
+    [DSBezelActivityView removeViewAnimated:YES];
 }
 
 - (void)downloadContentFailed:(UASubscriptionContent *)content {
@@ -175,7 +228,7 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
 
 @implementation UASubscriptionContentCell
 
-@synthesize title, contentDescription, icon, downloadButton, restoreButton, content;
+@synthesize title, contentDescription, icon, downloadButton, restoreButton, activateButton, deleteButton, content, owningTable;
 @synthesize progressBar;
 
 - (void)dealloc {
@@ -184,6 +237,8 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
     RELEASE_SAFELY(contentDescription);
     RELEASE_SAFELY(icon);
     RELEASE_SAFELY(downloadButton);
+    RELEASE_SAFELY(deleteButton);
+    RELEASE_SAFELY(activateButton);
     RELEASE_SAFELY(restoreButton);
     RELEASE_SAFELY(progressBar);
     [super dealloc];
@@ -207,6 +262,10 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
     if (progress >= 1) {
         progressBar.hidden = YES;
         [content removeObservers];
+        if (progressBar.hidden == YES)
+        {
+            [DSBezelActivityView activityViewForView:self.owningTable withLabel:@"Installing"];
+        }
     }
     else {
         progressBar.hidden = NO;
@@ -225,22 +284,100 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
 }
 
 - (void)setButtonState:(BOOL)contentIsDownloaded {
-    downloadButton.hidden = contentIsDownloaded;
-    restoreButton.hidden = !contentIsDownloaded;
-    if (content.downloading) {
-        restoreButton.enabled = !contentIsDownloaded;
-        downloadButton.enabled = contentIsDownloaded;
-    } else {
-        downloadButton.enabled = YES;
-        restoreButton.enabled = YES;
+    deleteButton.hidden = YES;
+    deleteButton.enabled = NO;
+    restoreButton.hidden = YES;
+    restoreButton.enabled = NO;
+    downloadButton.hidden = YES;
+    downloadButton.enabled = NO;
+    
+    switch ([content state]) {
+        case NOT_DOWNLOADED:
+            downloadButton.hidden = NO;
+            downloadButton.enabled = YES;
+            break;
+        case DOWNLOADED:
+            deleteButton.hidden = NO;
+            deleteButton.enabled = YES;
+            break;
+        case DOWNLOADED_BUT_DELETED:
+            restoreButton.hidden = NO;
+            restoreButton.enabled = YES;
+            break;
+        case ACTIVE:
+            break;
+        default:
+            break;
     }
 }
 
-- (IBAction)actionButtonClicked:(id)sender {
-    UIButton *button = (UIButton *)sender;
+- (void) download
+{
     if (!content.downloading) {
-        button.enabled = NO;
+        downloadButton.enabled = NO;
         [[UASubscriptionManager shared].inventory download:content];
+    }
+    //[DSBezelActivityView activityViewForView:self.owningTable withLabel:@"Installing"];
+}
+
+- (IBAction)actionButtonClicked:(id)sender {
+    
+    switch ([content state]) {
+        case NOT_DOWNLOADED:
+            [self download];
+            break;
+        case DOWNLOADED:
+        {
+            UIAlertView *alert = [[UIAlertView alloc] 
+                                  initWithTitle: NSLocalizedString(@"Delete Content",nil)
+                                  message: NSLocalizedString(@"Are you sure you want to delete the selected content",nil)
+                                  delegate: self
+                                  cancelButtonTitle: NSLocalizedString(@"Cancel",nil)
+                                  otherButtonTitles: NSLocalizedString(@"Delete",nil), nil];
+            [alert show];
+            [alert release];
+            
+            break;
+        }
+        case DOWNLOADED_BUT_DELETED:
+            [self download];
+            break;
+        case ACTIVE:
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+    
+    switch (buttonIndex) {
+        case 0: 
+        {       
+            NSLog(@"Delete was cancelled by the user");
+        }
+            break;
+            
+        case 1: 
+        {
+            [DSBezelActivityView activityViewForView:self.owningTable withLabel:@"Deleting"];
+            dispatch_async( dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                NSFileManager *manager = [[NSFileManager alloc] init];
+                NSString *pathToContent = [[[ActiveContentPath downloadDirectory] stringByAppendingPathComponent:content.subscriptionKey] stringByAppendingPathComponent:content.contentName];
+                NSError *error = nil;
+                BOOL success = [manager removeItemAtPath:pathToContent error:&error];
+                if (!success)
+                {
+                    NSLog(@"Cannot delete the file: %@", pathToContent);
+                }
+                [manager release];
+                dispatch_async( dispatch_get_main_queue(), ^{
+                    [DSBezelActivityView removeViewAnimated:YES];
+                    [self setButtonState:NO];
+                });
+            });
+        }
+            break;
     }
 }
 

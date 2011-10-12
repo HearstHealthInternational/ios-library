@@ -35,6 +35,8 @@
 #import "UASubscriptionSettingsViewController.h"
 #import "UASubscriptionRootViewController.h"
 
+#import "DSActivityView.h"
+
 @implementation UASubscriptionRootViewController
 
 
@@ -51,6 +53,7 @@
 
 
 - (void)viewDidLoad {
+    self.navigationItem.title = @"Subscriptions";
     self.navigationItem.leftBarButtonItem = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
                                                                                            target:self
                                                                                            action:@selector(quit)] autorelease];
@@ -59,6 +62,8 @@
 //                                                                             style:UIBarButtonItemStylePlain
 //                                                                            target:self
 //                                                                            action:@selector(loadSettingsView)] autorelease];
+    
+    productsTable.backgroundColor = [UIColor clearColor];
     
     self.navigationItem.rightBarButtonItem = [[[UIBarButtonItem alloc] initWithTitle:UA_SS_TR(@"UA_Restore")
                                                                               style:UIBarButtonItemStylePlain
@@ -146,6 +151,7 @@
 }
 
 - (void)restore {
+    [DSBezelActivityView activityViewForView:self.view withLabel:@"Updating"];
     [[UASubscriptionManager shared] restoreAutorenewables];
 }
 
@@ -194,14 +200,17 @@
 
 - (void)restoreAutorenewablesFinished:(NSArray *)productsRestored {
     UALOG(@"Autorenewable restore finished. %d products restored.",[productsRestored count]);
+    [DSBezelActivityView removeViewAnimated:YES];
 }
 
 - (void)restoreAutorenewablesFailedWithError:(NSError *)error {
     UALOG(@"Autorenewable restore failed with error code %d and reason=%@. Try again later.", [error code], [error localizedDescription]);
+    [DSBezelActivityView removeViewAnimated:YES];
 }
 
 - (void)restoreAutorenewableProductFailed:(UASubscriptionProduct *)product {
     UALOG(@"Autorenewable restore failed for product ID %@", product.productIdentifier);
+        [DSBezelActivityView removeViewAnimated:YES];
 }
 
 - (void)purchaseProductFailed:(UASubscriptionProduct *)failedProduct withError:(NSError *)error {

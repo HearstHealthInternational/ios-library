@@ -30,11 +30,11 @@
 
 @interface UASubscriptionProductCell : UITableViewCell {
     UASubscriptionProduct *product;
-    UAAsyncImageView *iconContainer;
+//    UAAsyncImageView *iconContainer;
     UASubscriptionProductCellView *cellView;
 }
 
-@property (nonatomic, assign) UAAsyncImageView *iconContainer;
+//@property (nonatomic, assign) UAAsyncImageView *iconContainer;
 @property (nonatomic, assign) UASubscriptionProduct *product;
 @property (nonatomic, assign) UASubscriptionProductCellView *cellView;
 

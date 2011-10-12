@@ -25,6 +25,7 @@
 
 #import <Foundation/Foundation.h>
 #import "UASubscriptionManager.h"
+#import "GradientButton.h"
 
 @class UASubscriptionContentDetailViewController;
 @interface UASubscriptionContentsViewController : UIViewController
@@ -33,11 +34,13 @@
     NSMutableArray *dataSource;
     NSMutableArray *downloadedContents;
     NSMutableArray *undownloadedContents;
+    NSMutableArray *contents;
     UASubscriptionContentDetailViewController *detailViewController;
     NSString *subscriptionKey;
 }
 @property (retain) IBOutlet UITableView *contentsTable;
 @property (nonatomic, retain) NSString *subscriptionKey;
+@property (nonatomic, retain) NSMutableArray *contents;
 
 - (void)updateDataSource;
 
@@ -46,19 +49,23 @@
 
 @class UAAsyncImageView;
 @class UASubscriptionContent;
-@interface UASubscriptionContentCell : UITableViewCell {
+@interface UASubscriptionContentCell : UITableViewCell <UIAlertViewDelegate>{
     UILabel *title;
     UILabel *contentDescription;
     UAAsyncImageView *icon;
-    UIButton *downloadButton, *restoreButton;
+    UIButton *downloadButton, *restoreButton, *activateButton;
+    GradientButton *deleteButton;
     UASubscriptionContent *content;
     UIProgressView *progressBar;
+    UITableView* owningTable;
 }
 @property (nonatomic, retain) IBOutlet UILabel *title;
 @property (nonatomic, retain) IBOutlet UILabel *contentDescription;
 @property (nonatomic, retain) IBOutlet UAAsyncImageView *icon;
-@property (nonatomic, retain) IBOutlet UIButton *downloadButton, *restoreButton;
+@property (nonatomic, retain) IBOutlet UIButton *downloadButton, *restoreButton, *activateButton;
+@property (nonatomic, retain) IBOutlet GradientButton *deleteButton;
 @property (nonatomic, retain) IBOutlet UIProgressView *progressBar;
+@property (nonatomic) UITableView *owningTable;
 // Has to retain content. Since content instance could be changed if new product purchased,
 // result in invoking released object
 @property (nonatomic, retain) UASubscriptionContent *content;

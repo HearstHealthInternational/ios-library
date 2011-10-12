@@ -131,6 +131,7 @@
 }
 
 - (void)updateTitle {
+    NSLog(@"wrong fucking class");
     if (product.autorenewable) {
         NSString *arDurationString = 
             [UASubscriptionUIUtil localizedAutorenewableDuration:product.autorenewableDuration];

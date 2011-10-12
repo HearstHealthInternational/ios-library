@@ -24,12 +24,13 @@
  */
 
 #import "UASubscriptionTableViewDelegate.h"
-#import "UASubscriptionProductCell.h"
+//#import "UASubscriptionProductCell.h"
 #import "UAViewUtils.h"
 #import "UASubscription.h"
 #import "UASubscriptionInventory.h"
 #import "UASubscriptionProductDetailViewController.h"
 #import "UASubscriptionContentsViewController.h"
+#import "MOMUASubscriptionProductCell.h"
 
 @implementation UASubscriptionTableViewDelegate
 
@@ -44,7 +45,7 @@
         return nil;
 
     rootViewController = aRootViewController;
-    cell_uniq_id = @"SubscriptionProductTableViewCell";
+    cell_uniq_id = @"MOMSubscriptionProductTableViewCell";
     return self;
 }
 
@@ -72,14 +73,15 @@
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UASubscriptionProductCell *cell = (UASubscriptionProductCell *)[tableView dequeueReusableCellWithIdentifier:cell_uniq_id];
+    MOMUASubscriptionProductCell *cell = (MOMUASubscriptionProductCell *)[tableView dequeueReusableCellWithIdentifier:cell_uniq_id];
     if (cell == nil) {
-        cell = [[[UASubscriptionProductCell alloc] initWithStyle:UITableViewCellStyleDefault
-                                                 reuseIdentifier:cell_uniq_id] autorelease];
-        [UAViewUtils roundView:cell.iconContainer borderRadius:10 borderWidth:1 color:[UIColor darkGrayColor]];
+        // Load the top-level objects from the custom cell XIB.
+        NSArray *topLevelObjects = [[NSBundle mainBundle] loadNibNamed:@"MOMUASubscriptionProductCell" owner:self options:nil];
+        // Grab a pointer to the first object (presumably the custom cell, as that's all the XIB should contain).
+        cell = (MOMUASubscriptionProductCell *) [topLevelObjects objectAtIndex:0];
     }
     cell.product = [self productAtIndexPath:indexPath];
-
+    [cell refreshCellView];
     return cell;
 }
 
