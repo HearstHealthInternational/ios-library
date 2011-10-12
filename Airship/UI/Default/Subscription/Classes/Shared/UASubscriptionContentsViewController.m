@@ -154,53 +154,8 @@ static NSString *CELL_UNIQ_ID = @"UASubscriptionContentCell";
     // backend data is automatically updated
     [contentsTable reloadData];
 
-    [ActiveContentPath setActiveInternationalContent:[[ActiveContentPath downloadDirectory] stringByAppendingPathComponent:content.contentName]];
-    NSString *documentsDirectory = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) objectAtIndex:0];
-
-    NSString *productId = @"V0Df3iiTQYyWtm-KV3VFJQ";
-    NSString *filename = @"Xml";
-
-    NSString* libraryPath = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) objectAtIndex:0];
-    // build the fill paths by appending ua and downloads to the base libraryPath
-    NSString *downloadDirectory = [libraryPath stringByAppendingPathComponent:@"ua"];
-    downloadDirectory = [downloadDirectory stringByAppendingPathComponent:@"downloads"];
-
-    // Append the product id:
-    downloadDirectory = [downloadDirectory stringByAppendingPathComponent:productId];
-    NSString *folderPath = [libraryPath stringByAppendingPathComponent:content.contentName];
-
-    NSLog(@"Contents of %@", downloadDirectory);
-    NSFileManager *fileManager = [[NSFileManager alloc] init];
-
-    // now append your filename
-    NSString *fullPathToMyFile = [downloadDirectory stringByAppendingPathComponent:content.contentName];
-    NSLog(content.contentName);
-    if ([fileManager fileExistsAtPath:fullPathToMyFile])
-    {
-        NSLog(@"download exists");
-    }
-    else
-    {
-        NSLog(@"download does not exist");
-    }
-    NSLog(@"Source Path: %@\n destination Path: %@ \n", fullPathToMyFile, folderPath);
-    NSError *error = nil;
-
-    BOOL success = [fileManager copyItemAtPath:fullPathToMyFile
-                                            toPath:folderPath
-                                             error:&error];
-    [fileManager release];
-
-    if (!success)
-    {
-        NSLog(@"Error description-%@ \n", [error localizedDescription]);
-        NSLog(@"Error reason-%@", [error localizedFailureReason]);
-    }
-    else
-    {
-        [ActiveContentPath setActiveInternationalContent:fullPathToMyFile];
-    }
-    UALOG(@"copy complete");
+    NSString* fullPathToDownload = [[[ActiveContentPath downloadDirectory] stringByAppendingPathComponent:content.subscriptionKey] stringByAppendingPathComponent:content.contentName];
+    [ActiveContentPath setActiveInternationalContent:fullPathToDownload];
 }
 
 - (void)downloadContentFailed:(UASubscriptionContent *)content {
