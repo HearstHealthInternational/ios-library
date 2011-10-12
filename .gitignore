@@ -8,6 +8,7 @@ docs/
 Debug/
 Release/
 Distribution/
+Airship/.redcar/
 build/
 Airship/libUAirship-*.a
 xcuserdata/
